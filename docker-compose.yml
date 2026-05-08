@@ -1,0 +1,107 @@
+name: travel-shot-agent
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: travelshot-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-travelshot}
+      POSTGRES_USER: ${POSTGRES_USER:-travelshot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-travelshot_dev_password}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-travelshot} -d ${POSTGRES_DB:-travelshot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: travelshot-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: travelshot-api
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-travelshot}:${POSTGRES_PASSWORD:-travelshot_dev_password}@postgres:5432/${POSTGRES_DB:-travelshot}
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      API_ACCESS_TOKEN: ${API_ACCESS_TOKEN:-}
+      API_RATE_LIMIT_PER_MINUTE: ${API_RATE_LIMIT_PER_MINUTE:-60}
+      REQUIRE_RUNTIME_SERVICES: ${REQUIRE_RUNTIME_SERVICES:-true}
+      RUNTIME_CHECK_TIMEOUT_SECONDS: ${RUNTIME_CHECK_TIMEOUT_SECONDS:-0.75}
+      SPOT_DATA_DIR: /app/db/seed/spots
+      IMPORT_SEED_SPOTS_ON_STARTUP: ${IMPORT_SEED_SPOTS_ON_STARTUP:-true}
+      OPEN_METEO_BASE_URL: ${OPEN_METEO_BASE_URL:-https://api.open-meteo.com}
+      TOOL_CACHE_TTL_SECONDS: ${TOOL_CACHE_TTL_SECONDS:-1800}
+      AMAP_API_KEY: ${AMAP_API_KEY:-}
+      MAPS_API_KEY: ${MAPS_API_KEY:-}
+      AMAP_BASE_URL: ${AMAP_BASE_URL:-https://restapi.amap.com}
+      AMAP_TIMEOUT_SECONDS: ${AMAP_TIMEOUT_SECONDS:-5}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      SEARCH_API_KEY: ${SEARCH_API_KEY:-}
+      TAVILY_BASE_URL: ${TAVILY_BASE_URL:-https://api.tavily.com}
+      TAVILY_TIMEOUT_SECONDS: ${TAVILY_TIMEOUT_SECONDS:-8}
+      TAVILY_SEARCH_DEPTH: ${TAVILY_SEARCH_DEPTH:-basic}
+      TAVILY_MAX_RESULTS: ${TAVILY_MAX_RESULTS:-5}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      LLM_MODEL: ${LLM_MODEL:-qwen-plus}
+      LLM_GOAL_PARSER_MODE: ${LLM_GOAL_PARSER_MODE:-always}
+      LLM_PLAN_REPAIR_MODE: ${LLM_PLAN_REPAIR_MODE:-auto}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-90}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-2}
+      LLM_RETRY_BASE_DELAY_SECONDS: ${LLM_RETRY_BASE_DELAY_SECONDS:-1.5}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-6144}
+      AGENT_MAX_LLM_CALLS: ${AGENT_MAX_LLM_CALLS:-7}
+      AGENT_MAX_TOOL_ROUNDS: ${AGENT_MAX_TOOL_ROUNDS:-4}
+      AGENT_MAX_TOOL_REQUESTS_PER_BATCH: ${AGENT_MAX_TOOL_REQUESTS_PER_BATCH:-10}
+      AGENT_MAX_ROUTE_REQUESTS: ${AGENT_MAX_ROUTE_REQUESTS:-4}
+      AGENT_ROUTE_TOOLS_MAX_DATES: ${AGENT_ROUTE_TOOLS_MAX_DATES:-3}
+      PLAN_CACHE_TTL_SECONDS: ${PLAN_CACHE_TTL_SECONDS:-86400}
+      HISTORY_RETENTION_DAYS: ${HISTORY_RETENTION_DAYS:-7}
+      VISION_API_KEY: ${VISION_API_KEY:-}
+      VISION_BASE_URL: ${VISION_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      VISION_MODEL: ${VISION_MODEL:-qwen-vl-plus}
+      VISION_TIMEOUT_SECONDS: ${VISION_TIMEOUT_SECONDS:-60}
+      VISION_MAX_TOKENS: ${VISION_MAX_TOKENS:-4096}
+      WEATHER_TIMEOUT_SECONDS: ${WEATHER_TIMEOUT_SECONDS:-5}
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./apps/web
+    container_name: travelshot-web
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+      NEXT_PUBLIC_API_ACCESS_TOKEN: ${NEXT_PUBLIC_API_ACCESS_TOKEN:-}
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:
+  redis-data:

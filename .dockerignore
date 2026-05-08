@@ -1,0 +1,16 @@
+node_modules
+.npm-cache
+.env
+.env.*
+*.log
+__pycache__
+*.pyc
+*.egg-info
+.pytest_cache
+apps/web/.next
+apps/web/tsconfig.tsbuildinfo
+postgres-data
+redis-data
+.claude
+.codex-logs
+.logs

@@ -1,0 +1,14 @@
+{
+  "name": "travel-shot-agent",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace apps/web run dev",
+    "build:web": "npm --workspace apps/web run build",
+    "lint:web": "npm --workspace apps/web run lint",
+    "dev:api": "python -m uvicorn app.main:app --app-dir apps/api --reload --host 127.0.0.1 --port 8000"
+  }
+}
